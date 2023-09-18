@@ -122,6 +122,8 @@ TT_POW = "POW"
 TT_EQ = "EQ"
 TT_LPAREN = "LPAREN"
 TT_RPAREN = "RPAREN"
+TT_LCBRACK = "LCBRACK"
+TT_RCBRACK = "RCBRACK"
 TT_EE = "EE"
 TT_NE = "NE"
 TT_LT = "LT"
@@ -130,7 +132,7 @@ TT_LTE = "LTE"
 TT_GTE = "GTE"
 TT_EOF = "EOF"
 
-KEYWORDS = ["AND", "OR", "NOT"]
+KEYWORDS = ["and", "or", "NOT", "if", "elif", "else", "then"]
 
 
 class Token:
@@ -204,6 +206,12 @@ class Lexer:
                 self.advance()
             elif self.current_char == ")":
                 tokens.append(Token(TT_RPAREN, pos_start=self.pos))
+                self.advance()
+            elif self.current_char == "{":
+                tokens.append(Token(TT_LCBRACK, pos_start=self.pos))
+                self.advance()
+            elif self.current_char == "}":
+                tokens.append(Token(TT_RCBRACK, pos_start=self.pos))
                 self.advance()
             elif self.current_char == "!":
                 tok, error = self.make_not_equals()
@@ -357,6 +365,15 @@ class UnaryOpNode:
         return f"({self.op_tok}, {self.node})"
 
 
+class IfNode:
+    def __init__(self, cases, else_case):
+        self.cases = cases
+        self.else_case = else_case
+
+        self.pos_start = self.cases[0][0].pos_start
+        self.pos_end = self.else_case or self.cases[len(self.cases) - 1][0].pos_end
+
+
 #######################################
 # PARSE RESULT
 #######################################
@@ -461,6 +478,12 @@ class Parser:
                     )
                 )
 
+        elif tok.matches(TT_KEYWORD, "if"):
+            if_expr = res.register(self.if_expr())
+            if res.error:
+                return res
+            return res.success(if_expr)
+
         return res.failure(
             InvalidSyntaxError(
                 tok.pos_start,
@@ -555,7 +578,7 @@ class Parser:
                 self.back()
 
         node = res.register(
-            self.bin_op(self.comp_expr, ((TT_KEYWORD, "AND"), (TT_KEYWORD, "OR")))
+            self.bin_op(self.comp_expr, ((TT_KEYWORD, "and"), (TT_KEYWORD, "or")))
         )
 
         if res.error:
@@ -568,6 +591,176 @@ class Parser:
             )
 
         return res.success(node)
+
+    def if_expr(self):
+        res = ParseResult()
+        cases = []
+        else_case = None
+
+        if not self.current_tok.matches(TT_KEYWORD, "if"):
+            return res.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    f"Expected 'if'",
+                )
+            )
+
+        res.register_advancement()
+        self.advance()
+
+        if self.current_tok.type != TT_LPAREN:
+            return res.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    f"Expected '('",
+                )
+            )
+
+        res.register_advancement()
+        self.advance()
+
+        condition = res.register(self.expr())
+        if res.error:
+            return res
+
+        if self.current_tok.type != TT_RPAREN:
+            return res.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    f"Expected ')'",
+                )
+            )
+
+        res.register_advancement()
+        self.advance()
+
+        if self.current_tok.type != TT_LCBRACK:
+            return res.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '{'",
+                )
+            )
+
+        res.register_advancement()
+        self.advance()
+
+        expr = res.register(self.expr())
+        if res.error:
+            return res
+        cases.append((condition, expr))
+
+        if self.current_tok.type != TT_RCBRACK:
+            return res.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '}'",
+                )
+            )
+
+        res.register_advancement()
+        self.advance()
+
+        while self.current_tok.matches(TT_KEYWORD, "elif"):
+            res.register_advancement()
+            self.advance()
+
+            if self.current_tok.type != TT_LPAREN:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        f"Expected '('",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+            condition = res.register(self.expr())
+            if res.error:
+                return res
+
+            if self.current_tok.type != TT_RPAREN:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        f"Expected ')'",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+            if self.current_tok.type != TT_LCBRACK:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '{'",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+            expr = res.register(self.expr())
+            if res.error:
+                return res
+            cases.append((condition, expr))
+
+            if self.current_tok.type != TT_RCBRACK:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '}'",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+        if self.current_tok.matches(TT_KEYWORD, "else"):
+            res.register_advancement()
+            self.advance()
+
+            if self.current_tok.type != TT_LCBRACK:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '{'",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+            expr = res.register(self.expr())
+            if res.error:
+                return res
+            else_case = expr
+
+            if self.current_tok.type != TT_RCBRACK:
+                return res.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '}'",
+                    )
+                )
+
+            res.register_advancement()
+            self.advance()
+
+        return res.success(IfNode(cases, else_case))
 
     ###################################
 
@@ -729,6 +922,9 @@ class Number:
         copy.set_context(self.context)
         return copy
 
+    def is_true(self):
+        return self.value != 0
+
     def __repr__(self):
         return str(self.value)
 
@@ -851,9 +1047,9 @@ class Interpreter:
             result, error = left.get_comparison_lte(right)
         elif node.op_tok.type == TT_GTE:
             result, error = left.get_comparison_gte(right)
-        elif node.op_tok.matches(TT_KEYWORD, "AND"):
+        elif node.op_tok.matches(TT_KEYWORD, "and"):
             result, error = left.anded_by(right)
-        elif node.op_tok.matches(TT_KEYWORD, "OR"):
+        elif node.op_tok.matches(TT_KEYWORD, "or"):
             result, error = left.ored_by(right)
 
         if error:
@@ -877,6 +1073,28 @@ class Interpreter:
             return res.failure(error)
         else:
             return res.success(number.set_pos(node.pos_start, node.pos_end))
+
+    def visit_IfNode(self, node, context):
+        res = RTResult()
+
+        for condition, expr in node.cases:
+            condition_value = res.register(self.visit(condition, context))
+            if res.error:
+                return res
+
+            if condition_value.is_true():
+                expr_value = res.register(self.visit(expr, context))
+                if res.error:
+                    return res
+                return res.success(expr_value)
+
+        if node.else_case:
+            else_value = res.register(self.visit(node.else_case, context))
+            if res.error:
+                return res
+            return res.success(else_value)
+
+        return res.success(None)
 
 
 #######################################
