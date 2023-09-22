@@ -12,18 +12,26 @@ term        : factor((MUL|DIV) factor)*
 factor      : (PLUS|MINUS) factor
             : power
 
-power       : atom (POW factor)*
+power       : call (POW factor)*
+
+call        : atom(LPAREN (expr (COMMA expr)*)? RPAREN )?
 
 atom        : INT|FLOAT|IDENTIFIER
             : LPAREN expr RPAREN
             : if-expr
             : for-expr
             : while-expr
+            : func-def
 
-if-expr     : KEYWORD:if (expr) {expr}
-              (KEYWORD:elif( expr) {expr})*
-              (KEYWORD:else {expr})?
+if-expr     : KEYWORD:if LPAREN expr RPAREN LCBRACK expr RCBRACK
+              KEYWORD:elif LPAREN expr RPAREN LCBRACK expr RCBRACK*
+              KEYWORD:else LCBRACK expr RCBRACK?
 
-for-expr    : KEYWORD:for (IDENTIFIER EQ expr KEYWORD:To expr (KEYWORD:step expr)?) {expr}
+for-expr    : KEYWORD:for LPAREN IDENTIFIER EQ expr KEYWORD:to expr (KEYWORD:step expr)? RPAREN LCBRACK expr RCBRACK
 
-while-expr  : KEYWORD:while (expr) {expr}
+while-expr  : KEYWORD:while LPAREN expr RPAREN LCBRACK expr RCBRACK
+
+func-def    : KEYWORD:func IDENTIFIER 
+              LPAREN (IDENTIFIER(COMMA IDENTIFIER)*)? RPAREN
+              LCBRACK expr RCBRACK
+
