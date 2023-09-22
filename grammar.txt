@@ -18,10 +18,13 @@ call        : atom(LPAREN (expr (COMMA expr)*)? RPAREN )?
 
 atom        : INT|FLOAT|STRING|IDENTIFIER
             : LPAREN expr RPAREN
+            : list-expr
             : if-expr
             : for-expr
             : while-expr
             : func-def
+
+list-expr : LSBRACK (expr (COMMA expr)*)? RSBRACK
 
 if-expr     : KEYWORD:if LPAREN expr RPAREN LCBRACK expr RCBRACK
               KEYWORD:elif LPAREN expr RPAREN LCBRACK expr RCBRACK*
