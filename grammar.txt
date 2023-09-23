@@ -1,3 +1,5 @@
+statements  : NEWLINE* expr (NEWLINE+ expr)* NEWLINE*
+
 expr        : IDENTIFIER EQ expr
             : comp-expr((KEYWORD:AND|KEYWORD:OR) comp-expr)*
 
@@ -26,7 +28,10 @@ atom        : INT|FLOAT|STRING|IDENTIFIER
 
 list-expr : LSBRACK (expr (COMMA expr)*)? RSBRACK
 
-if-expr     : KEYWORD:if LPAREN expr RPAREN LCBRACK expr RCBRACK
+if-expr     : KEYWORD:if expr LCBRACK 
+              (expr else-if-expr|else-expr) 
+            | (NEWLINE statements |else-if-expr|else-expr)  
+              RCBRACK
               KEYWORD:elif LPAREN expr RPAREN LCBRACK expr RCBRACK*
               KEYWORD:else LCBRACK expr RCBRACK?
 
