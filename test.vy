@@ -7,3 +7,4 @@ while i < 10{
 }
 
 display(i)
+display("hello")
