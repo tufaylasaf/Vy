@@ -1,1 +1,2 @@
-display("Hello there")
+display("Hello")
+display("Bye")
